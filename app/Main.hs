@@ -31,8 +31,8 @@ data Span = Span
   , end   :: !Pos
   } deriving (Show, Eq, Ord)
 
-merge :: Span -> Span -> Span
-merge (Span s _) (Span _ e) = (Span s e)
+merge_span :: Span -> Span -> Span
+merge_span (Span s _) (Span _ e) = (Span s e)
 
 print_span :: (Vector Text) -> Span -> IO ()
 print_span lines' sp
@@ -174,7 +174,10 @@ skip_space :: Input -> Input
 skip_space = skip_while isSpace
 
 try_word :: Text -> Input -> Maybe (Span, Input)
-try_word target (Input pos0 cur0 rest0) = do
+try_word target = _try_word target . skip_space
+
+_try_word :: Text -> Input -> Maybe (Span, Input)
+_try_word target (Input pos0 cur0 rest0) = do
   curRest <- T.stripPrefix target cur0      -- if Nothing → whole function = Nothing
   let len  = T.length target
       pos1 = add_col len pos0
@@ -183,7 +186,10 @@ try_word target (Input pos0 cur0 rest0) = do
 
 
 try_ident :: Input -> Maybe (Text, Span, Input)
-try_ident inp@(Input pos0 _ _) = do
+try_ident = _try_ident . skip_space
+
+_try_ident :: Input -> Maybe (Text, Span, Input)
+_try_ident inp@(Input pos0 _ _) = do
   (firstC, inp1) <- next_char inp
   if isAlpha firstC
     then do
@@ -196,7 +202,10 @@ try_ident inp@(Input pos0 _ _) = do
 
 
 try_num :: Input -> Maybe (Word64, Span, Input)
-try_num inp@(Input pos0 _ _) = do
+try_num = _try_num . skip_space
+
+_try_num :: Input -> Maybe (Word64, Span, Input)
+_try_num inp@(Input pos0 _ _) = do
   (firstC, inp1) <- next_char inp
   if not (isDigit firstC)
     then Nothing
@@ -220,14 +229,17 @@ textToWord64 = T.foldl' step (Just 0)
         else Just y
 
 try_string :: Input -> Maybe (Text, Span, Input)
-try_string inp@(Input pos0 _ _) = do
-  (firstC, inp1) <- next_char inp
+try_string = _try_string . skip_space
+
+_try_string :: Input -> Maybe (Text, Span, Input)
+_try_string inp0@(Input pos0 _ _) = do
+  (firstC, inp1) <- next_char inp0
   if firstC /= '"'
     then Nothing
     else parseBody mempty inp1
   where
-    parseBody acc inp@(Input _ cur _) =
-      case T.uncons cur of
+    parseBody acc inp =
+      case T.uncons (cur inp) of
 
         -- end of string
         Just ('"', _) -> do
@@ -265,6 +277,88 @@ parseEscape inp = do
     _    -> Nothing
 
 
+data Token
+  = TokIdent  Text
+  | TokNum    Word64
+  | TokString Text
+  | TokLParen
+  | TokRParen
+  deriving (Show, Eq)
+
+try_token :: Input -> Maybe (Token, Span, Input)
+try_token inp0 =
+  let inp = skip_space inp0
+  in case T.uncons (cur inp) of
+       Just (c, _) 
+         | isAlpha c ->
+             do (txt, sp, inp') <- _try_ident inp
+                pure (TokIdent txt, sp, inp')
+
+         | isDigit c ->
+             do (n, sp, inp') <- _try_num inp
+                pure (TokNum n, sp, inp')
+
+         | c == '"' ->
+             do (txt, sp, inp') <- _try_string inp
+                pure (TokString txt, sp, inp')
+
+         | c == '(' ->
+             do (_, inp') <- next_char inp
+                let sp = Span (pos inp) (pos inp')
+                pure (TokLParen, sp, inp')
+
+         | c == ')' ->
+             do (_, inp') <- next_char inp
+                let sp = Span (pos inp) (pos inp')
+                pure (TokRParen, sp, inp')
+
+       _ -> Nothing
+
+data Expr
+  = ENum    Span Word64
+  | EString Span Text
+  | ESymbol Span Text
+  | EList   Span [Expr]
+  deriving (Show, Eq)
+
+try_expr :: Input -> Maybe (Expr, Input)
+try_expr inp = do
+  (tok, sp, inp1) <- try_token inp
+  case tok of
+    TokNum n      -> pure (ENum sp n, inp1)
+    TokString s   -> pure (EString sp s, inp1)
+    TokIdent s    -> pure (ESymbol sp s, inp1)
+    TokLParen     -> _try_list_from_open sp inp1
+    TokRParen     -> Nothing   -- unexpected ')'
+
+try_list :: Input -> Maybe (Expr, Input)
+try_list = _try_list . skip_space
+
+_try_list :: Input -> Maybe (Expr, Input)
+_try_list inp0 = do
+  (TokLParen, spOpen, inp1) <- try_token inp0
+  _try_list_from_open spOpen inp1
+
+
+_try_list_from_open :: Span -> Input -> Maybe (Expr, Input)
+_try_list_from_open spOpen = loop []
+  where
+    loop acc inp =
+      case try_token inp of
+
+        -- closing paren ends the list
+        Just (TokRParen, spClose, inp') ->
+          pure (EList (merge_span spOpen spClose) (reverse acc), inp')
+
+        -- more expressions inside the list
+        Just _ -> do
+          (e, inp1) <- try_expr inp
+          loop (e:acc) inp1
+
+        -- EOF before ')'
+        Nothing ->
+          Nothing
+
 -- main :: IO ()
 -- main = do
 --     ls <- read_file "README.md"
@@ -296,63 +390,33 @@ parseEscape inp = do
 
 --   putStrLn "\n== done =="
 
-
 main :: IO ()
 main = do
-  putStrLn "===== Parser Streaming Test ====="
+  putStrLn "===== Lisp Parser Test ====="
 
   let srcLines =
-        [ "hello 123 \"hi\\nthere\""
-        , "world"
-        , "oops"
+        [ "(define (square x) (mul x x))"
+        , "(print (square 5))"
         ]
 
   let inp0 = new_input (V.fromList srcLines)
+
   putStrLn "\n-- Start Input --"
   print inp0
 
+  putStrLn "\n== Parse first expr =="
+  case try_expr inp0 of
+    Nothing ->
+      putStrLn "FAILED: could not parse first expr"
+    Just (expr1, inp1) -> do
+      print expr1
 
-  ---------------- IDENT ----------------
-  putStrLn "\ntry_ident (expect \"hello\")"
-  let r1 = try_ident inp0
-  print r1
+      putStrLn "\n== Parse second expr =="
+      case try_expr inp1 of
+        Nothing ->
+          putStrLn "FAILED: could not parse second expr"
+        Just (expr2, _) -> do
+          print expr2
 
-
-  ---------------- NUM ----------------
-  putStrLn "\ntry_num right after ident (expect 123)"
-  let r2 = do
-        (_,_,inp1) <- r1
-        let inp1' = skip_space inp1
-        try_num inp1'
-  print r2
-
-
-  ---------------- STRING ----------------
-  putStrLn "\ntry_string right after number (expect \"hi\\nthere\")"
-  let r3 = do
-        (_,_,inp2) <- r2
-        let inp2' = skip_space inp2
-        try_string inp2'
-  print r3
-
-
-  ---------------- FAILURE TEST ----------------
-  putStrLn "\ntry_num after string (expect Nothing)"
-  let r4 = do
-        (_,_,inp3) <- r3
-        let inp3' = skip_space inp3
-        try_num inp3'
-  print r4
-
-
-  ---------------- NEXT LINE IDENT ----------------
-  putStrLn "\ntry_ident after string (expect \"world\")"
-  let r5 = do
-        (_,_,inp3) <- r3
-        let inp3' = skip_space inp3
-        try_ident inp3'
-  print r5
-
-
-  putStrLn "\n===== Done ====="
+  putStrLn "\n== Done =="
 
