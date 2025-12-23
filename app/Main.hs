@@ -69,12 +69,6 @@ print_span lines' sp
       T.putStrLn out
 
 
-data CompileError
-  = ParseFailed Int
-  | UnexpectedToken Span
-  | UnknowenName Span
-  deriving (Eq)
-
 data Input = Input {
     pos :: !Pos ,
     cur :: !Text ,
@@ -350,7 +344,7 @@ _try_list_from_open spOpen = loop []
         Just (TokRParen, spClose, inp') ->
           pure (EList (merge_span spOpen spClose) (reverse acc), inp')
 
-        -- more expressions inside the list
+        -- more parse_exprssions inside the list
         Just _ -> do
           (e, inp1) <- try_expr inp
           loop (e:acc) inp1
@@ -358,6 +352,140 @@ _try_list_from_open spOpen = loop []
         -- EOF before ')'
         Nothing ->
           Nothing
+
+
+data ParseError
+  = UnexpectedEOF Pos
+  | UnexpectedToken Span
+  | ExpectedButGot Text Span
+  | NotCLose Span Pos --start end
+  deriving (Show, Eq)
+
+parse_token :: Input -> Either ParseError (Token, Span, Input)
+parse_token inp =
+  case try_token inp of
+    Just r -> Right r
+    Nothing -> (Left (UnexpectedEOF (pos inp)))
+
+
+parse_expr :: Input -> Either ParseError (Expr, Input)
+parse_expr inp = do
+  (tok, sp, inp1) <- parse_token inp
+  case tok of
+    TokNum n    -> Right (ENum sp n, inp1)
+    TokString s -> Right (EString sp s, inp1)
+    TokIdent s  -> Right (ESymbol sp s, inp1)
+    TokLParen   -> parse_list_from_open sp inp1
+    TokRParen   -> Left (UnexpectedToken sp )
+
+
+parse_list :: Input -> Either ParseError (Expr, Input)
+parse_list = listStartE . skip_space
+
+listStartE :: Input -> Either ParseError (Expr, Input)
+listStartE inp0 = do
+  (tok, spOpen, inp1) <- parse_token inp0
+  case tok of
+    TokLParen -> parse_list_from_open spOpen inp1
+    _         -> Left (ExpectedButGot "'('" spOpen )
+
+
+parse_list_from_open :: Span -> Input -> Either ParseError (Expr, Input)
+parse_list_from_open spOpen = loop []
+  where
+    loop acc inp =
+      case try_token inp of
+        -- closing paren ends list
+        Just (TokRParen, spClose, inp') ->
+          Right (EList (merge_span spOpen spClose) (reverse acc), inp')
+
+        -- definitely another parse_exprssion
+        Just _ -> do
+          (e, inp1) <- parse_expr inp
+          loop (e:acc) inp1
+
+        -- EOF before ')'
+        Nothing ->
+          Left (NotCLose spOpen (pos inp))
+
+
+spanText :: Vector Text -> Span -> Text
+spanText vlines sp
+  | start sp > end sp = ""
+  | sLine == eLine =
+      sliceLine (vlines V.! sLine) sCol eCol
+  | otherwise =
+      T.intercalate "\n"
+        [ sliceLine (vlines V.! sLine) sCol (T.length (vlines V.! sLine))
+        , T.intercalate "\n"
+            [ vlines V.! i | i <- [sLine+1 .. eLine-1] ]
+        , T.take eCol (vlines V.! eLine)
+        ]
+  where
+    s = start sp
+    e = end sp
+    sLine = fromIntegral (line s)
+    eLine = fromIntegral (line e)
+    sCol  = fromIntegral (col  s)
+    eCol  = fromIntegral (col  e)
+
+
+printParseError :: Vector Text -> ParseError -> IO ()
+printParseError src err = do
+  putStrLn ("at " ++ showLineCol posLine posCol)
+  case err of
+
+    UnexpectedEOF _ -> do
+      putStrLn "error: unexpected end of input"
+      putStrLn ""
+      putStrLn "parser was here when input ended."
+
+    UnexpectedToken sp -> do
+      putStrLn "error: unexpected token:"
+      print_span src sp
+      pointerLine sp
+
+    ExpectedButGot expected sp -> do
+      putStrLn ("error: expected " ++ T.unpack expected ++ ", but got:")
+      print_span src sp
+      pointerLine sp
+
+    NotCLose openSp _ -> do
+      putStrLn "error: list opened here but never closed:"
+      print_span src openSp
+      pointerLine openSp
+  where
+    -- pick a representative position for the error to report
+    (posLine, posCol) =
+      case err of
+        UnexpectedEOF (Pos l c) -> (l, c)
+        UnexpectedToken sp       -> spanStart (start sp)
+        ExpectedButGot _ sp      -> spanStart (start sp)
+        NotCLose openSp _        -> spanStart (start openSp)
+
+    spanStart (Pos l c) = (l, c)
+
+    -- user-facing, 1-based indices
+    showLineCol l c =
+      "line " ++ show (fromIntegral l + 1 :: Int)
+      ++ ", column " ++ show (fromIntegral c + 1 :: Int)
+
+
+-- underline a span (only if single-line)
+pointerLine :: Span -> IO ()
+pointerLine sp
+  | line s /= line e = pure ()
+  | otherwise =
+      putStrLn $
+        replicate startC ' ' ++ replicate width '^'
+  where
+    s = start sp
+    e = end   sp
+    startC = fromIntegral (col s)
+    endC   = fromIntegral (col e)
+    width  = max 1 (endC - startC)
+
+
 
 -- main :: IO ()
 -- main = do
@@ -392,31 +520,80 @@ _try_list_from_open spOpen = loop []
 
 main :: IO ()
 main = do
-  putStrLn "===== Lisp Parser Test ====="
+  putStrLn "===== Lisp Parser Test (Error Reporting) ====="
 
-  let srcLines =
+  ------------------------------------------------------------
+  putStrLn "\n== OK example =="
+  let okSrc =
         [ "(define (square x) (mul x x))"
         , "(print (square 5))"
         ]
+      okVec = V.fromList okSrc
+      okInp = new_input okVec
 
-  let inp0 = new_input (V.fromList srcLines)
-
-  putStrLn "\n-- Start Input --"
-  print inp0
-
-  putStrLn "\n== Parse first expr =="
-  case try_expr inp0 of
-    Nothing ->
-      putStrLn "FAILED: could not parse first expr"
-    Just (expr1, inp1) -> do
+  case parse_expr okInp of
+    Left err -> printParseError okVec err
+    Right (expr1, inp1) -> do
       print expr1
-
-      putStrLn "\n== Parse second expr =="
-      case try_expr inp1 of
-        Nothing ->
-          putStrLn "FAILED: could not parse second expr"
-        Just (expr2, _) -> do
+      case parse_expr inp1 of
+        Left err -> printParseError okVec err
+        Right (expr2, _) ->
           print expr2
 
+
+  ------------------------------------------------------------
+  putStrLn "\n== UnexpectedToken example =="
+  -- lone ')' token
+  let utSrc =
+        [ ")" ]
+      utVec = V.fromList utSrc
+      utInp = new_input utVec
+
+  case parse_expr utInp of
+    Left err -> printParseError utVec err
+    Right (e, _) -> print e
+
+
+  ------------------------------------------------------------
+  putStrLn "\n== ExpectedButGot example =="
+  -- calling parse_list explicitly on something that’s NOT '('
+  let ebgSrc =
+        [ "123" ]
+      ebgVec = V.fromList ebgSrc
+      ebgInp = new_input ebgVec
+
+  case parse_list ebgInp of
+    Left err -> printParseError ebgVec err
+    Right (e, _) -> print e
+
+
+  ------------------------------------------------------------
+  putStrLn "\n== NotCLose (unclosed list) example =="
+  let ncSrc =
+        [ "(print (square 5"
+        ]
+      ncVec = V.fromList ncSrc
+      ncInp = new_input ncVec
+
+  case parse_expr ncInp of
+    Left err -> printParseError ncVec err
+    Right (e, _) -> print e
+
+
+  ------------------------------------------------------------
+  putStrLn "\n== UnexpectedEOF example =="
+  -- completely empty program
+  let eofSrc =
+        [ "" ]
+      eofVec = V.fromList eofSrc
+      eofInp = new_input eofVec
+
+  case parse_expr eofInp of
+    Left err -> printParseError eofVec err
+    Right (e, _) -> print e
+
+
+  ------------------------------------------------------------
   putStrLn "\n== Done =="
+
 
