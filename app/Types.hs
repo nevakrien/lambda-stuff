@@ -2,7 +2,7 @@ module Types where
 
 import Data.Text (Text)
 import Data.Word (Word32, Word64)
-import qualified Data.Vector as V
+import qualified Data.Vector()
 import Data.Vector (Vector)
 
 data Pos = Pos

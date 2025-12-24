@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 module Error where
 
 import Types
@@ -82,11 +83,23 @@ renderSpanContextExtra src sp endPos = do
   let (pre, mid, _) = spanWithContext src sp
 
   -- span from open start → end position
-  let (_, midToEnd0, midToEnd1) =
+  let (_, midToEnd0, _) =
         spanWithContext src (Span (start sp) endPos)
 
-  -- everything after the highlighted part
-  let post =
-        T.drop (T.length mid) (midToEnd0 <> midToEnd1)
+  putStrLn $
+       T.unpack pre
+    ++ errorHighlightStyle
+    ++ T.unpack mid
+    ++ ansiReset
+    ++ clipEnd 1000 midToEnd0
+    -- ++ clipEnd 1000 midToEnd1
 
-  renderStyledError pre mid post
+
+
+clipEnd :: Int -> Text -> String
+clipEnd maxLen txt
+  | T.length txt <= maxLen = T.unpack txt
+  | otherwise =
+      let len = T.length txt
+      in "\ESC[35m...\n\ESC[0m" ++ T.unpack (T.drop (len - maxLen) txt)
+
