@@ -52,40 +52,40 @@ _try_list_from_open spOpen = loop []
         Nothing ->
           Nothing
 
-parse_token :: Input -> Either ParseError (Token, Span, Input)
+parse_token :: Input -> Result ParseError (Token, Span, Input)
 parse_token inp =
   maybe 
-    (Left (UnexpectedEOF (pos inp))) 
-    Right (try_token inp)
+    (Err (UnexpectedEOF (pos inp))) 
+    Ok (try_token inp)
 
-parse_expr :: Input -> Either ParseError (AST, Input)
+parse_expr :: Input -> Result ParseError (AST, Input)
 parse_expr inp = do
   (tok, sp, inp1) <- parse_token inp
   case tok of
-    TokenNum n    -> Right (ASTNum sp n, inp1)
-    TokenString s -> Right (ASTString sp s, inp1)
-    TokenIdent s  -> Right (ASTSymbol sp s, inp1)
+    TokenNum n    -> Ok (ASTNum sp n, inp1)
+    TokenString s -> Ok (ASTString sp s, inp1)
+    TokenIdent s  -> Ok (ASTSymbol sp s, inp1)
     TokenLParen   -> parse_list_from_open sp inp1
-    TokenRParen   -> Left (UnexpectedToken sp )
+    TokenRParen   -> Err (UnexpectedToken sp )
 
-parse_list :: Input -> Either ParseError (AST, Input)
+parse_list :: Input -> Result ParseError (AST, Input)
 parse_list = listStartE . skip_space
 
-listStartE :: Input -> Either ParseError (AST, Input)
+listStartE :: Input -> Result ParseError (AST, Input)
 listStartE inp0 = do
   (tok, spOpen, inp1) <- parse_token inp0
   case tok of
     TokenLParen -> parse_list_from_open spOpen inp1
-    _         -> Left (ExpectedButGot (T.pack "'('") spOpen )
+    _         -> Err (ExpectedButGot (T.pack "'('") spOpen )
 
-parse_list_from_open :: Span -> Input -> Either ParseError (AST, Input)
+parse_list_from_open :: Span -> Input -> Result ParseError (AST, Input)
 parse_list_from_open spOpen = loop []
   where
     loop acc inp =
       case try_token inp of
         -- closing paren ends list
         Just (TokenRParen, spClose, inp') ->
-          Right (ASTList (mergeSpan spOpen spClose) (reverse acc), inp')
+          Ok (ASTList (mergeSpan spOpen spClose) (reverse acc), inp')
 
         -- definitely another parse_expression
         Just _ -> do
@@ -94,4 +94,4 @@ parse_list_from_open spOpen = loop []
 
         -- EOF before ')'
         Nothing ->
-          Left (NotClosed spOpen (pos inp))
+          Err (NotClosed spOpen (pos inp))

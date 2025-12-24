@@ -6,6 +6,7 @@ import qualified Data.Vector as V
 import Input
 import Parser
 import Error
+import Types  
 
 main :: IO ()
 main = do
@@ -21,12 +22,12 @@ main = do
       okInp = new_input okVec
 
   case parse_expr okInp of
-    Left err -> printParseError okVec err
-    Right (expr1, inp1) -> do
+    Err err -> printParseError okVec err
+    Ok (expr1, inp1) -> do
       print expr1
       case parse_expr inp1 of
-        Left err -> printParseError okVec err
-        Right (expr2, _) ->
+        Err err -> printParseError okVec err
+        Ok (expr2, _) ->
           print expr2
 
 
@@ -39,8 +40,8 @@ main = do
       utInp = new_input utVec
 
   case parse_expr utInp of
-    Left err -> printParseError utVec err
-    Right (e, _) -> print e
+    Err err -> printParseError utVec err
+    Ok (e, _) -> print e
 
 
   ------------------------------------------------------------
@@ -52,8 +53,8 @@ main = do
       ebgInp = new_input ebgVec
 
   case parse_list ebgInp of
-    Left err -> printParseError ebgVec err
-    Right (e, _) -> print e
+    Err err -> printParseError ebgVec err
+    Ok (e, _) -> print e
 
 
   ------------------------------------------------------------
@@ -69,8 +70,8 @@ main = do
       ncInp = new_input ncVec
 
   case parse_expr ncInp of
-    Left err -> printParseError ncVec err
-    Right (e, _) -> print e
+    Err err -> printParseError ncVec err
+    Ok (e, _) -> print e
 
 
   ------------------------------------------------------------
@@ -82,8 +83,8 @@ main = do
       eofInp = new_input eofVec
 
   case parse_expr eofInp of
-    Left err -> printParseError eofVec err
-    Right (e, _) -> print e
+    Err err -> printParseError eofVec err
+    Ok (e, _) -> print e
 
 
   ------------------------------------------------------------

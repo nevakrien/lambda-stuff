@@ -1,3 +1,5 @@
+{-# LANGUAGE PatternSynonyms #-}
+
 module Types
   ( Pos(..)
   , Span(..)
@@ -7,6 +9,9 @@ module Types
   , ParseError(..)
   , Value(..)
   , EvalError(..)
+  , Result
+  , pattern Ok
+  , pattern Err
   )
 where
 
@@ -64,3 +69,14 @@ data EvalError
   = NotAFunction Span
   | WrongNumberOfArguments Span Int Int -- expected got
    deriving (Show,Eq)
+
+
+type Result e a = Either e a
+
+pattern Ok :: a -> Result e a
+pattern Ok a = Right a
+
+pattern Err :: e -> Result e a
+pattern Err e = Left e
+
+{-# COMPLETE Ok, Err #-}
