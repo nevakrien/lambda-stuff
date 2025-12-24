@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use camelCase" #-}
 module Lexer where
 
 import Types
@@ -14,7 +16,7 @@ _try_word :: Text -> Input -> Maybe (Span, Input)
 _try_word target (Input pos0 cur0 rest0) = do
   curRest <- T.stripPrefix target cur0      -- if Nothing → whole function = Nothing
   let len  = T.length target
-      pos1 = add_col len pos0
+      pos1 = addCol len pos0
       sp   = Span pos0 pos1
   pure (sp, Input pos1 curRest rest0)
 
@@ -111,26 +113,26 @@ try_token inp0 =
   let inp = skip_space inp0
   in case T.uncons (cur inp) of
        Just (c, _) 
-         | isAlpha c ->
-             do (txt, sp, inp') <- _try_ident inp
-                pure (TokIdent txt, sp, inp')
+          | isAlpha c ->
+              do (txt, sp, inp') <- _try_ident inp
+                 pure (TokenIdent txt, sp, inp')
 
-         | isDigit c ->
-             do (n, sp, inp') <- _try_num inp
-                pure (TokNum n, sp, inp')
+          | isDigit c ->
+              do (n, sp, inp') <- _try_num inp
+                 pure (TokenNum n, sp, inp')
 
-         | c == '"' ->
-             do (txt, sp, inp') <- _try_string inp
-                pure (TokString txt, sp, inp')
+          | c == '"' ->
+              do (txt, sp, inp') <- _try_string inp
+                 pure (TokenString txt, sp, inp')
 
-         | c == '(' ->
-             do (_, inp') <- next_char inp
-                let sp = Span (pos inp) (pos inp')
-                pure (TokLParen, sp, inp')
+          | c == '(' ->
+              do (_, inp') <- next_char inp
+                 let sp = Span (pos inp) (pos inp')
+                 pure (TokenLParen, sp, inp')
 
-         | c == ')' ->
-             do (_, inp') <- next_char inp
-                let sp = Span (pos inp) (pos inp')
-                pure (TokRParen, sp, inp')
+          | c == ')' ->
+              do (_, inp') <- next_char inp
+                 let sp = Span (pos inp) (pos inp')
+                 pure (TokenRParen, sp, inp')
 
        _ -> Nothing

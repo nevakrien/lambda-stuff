@@ -1,9 +1,21 @@
-module Types where
+module Types
+  ( Pos(..)
+  , Span(..)
+  , Input(..)
+  , Token(..)
+  , AST(..)
+  , ParseError(..)
+  , Value(..)
+  , EvalError(..)
+  )
+where
+
 
 import Data.Text (Text)
 import Data.Word (Word32, Word64)
 import qualified Data.Vector()
 import Data.Vector (Vector)
+import Data.Type.Bool ()
 
 data Pos = Pos
   { line :: !Word32
@@ -22,23 +34,33 @@ data Input = Input {
 } deriving (Eq,Show)
 
 data Token
-  = TokIdent  Text
-  | TokNum    Word64
-  | TokString Text
-  | TokLParen
-  | TokRParen
+  = TokenIdent  Text
+  | TokenNum    Word64
+  | TokenString Text
+  | TokenLParen
+  | TokenRParen
   deriving (Show, Eq)
 
-data Expr
-  = ENum    Span Word64
-  | EString Span Text
-  | ESymbol Span Text
-  | EList   Span [Expr]
+data AST
+  = ASTNum    Span Word64
+  | ASTString Span Text
+  | ASTSymbol Span Text
+  | ASTList   Span [AST]
   deriving (Show, Eq)
+
+data Value
+  = ValNum    Word64
+  | ValString Text
+  deriving (Show,Eq)
 
 data ParseError
   = UnexpectedEOF Pos
   | UnexpectedToken Span
   | ExpectedButGot Text Span
-  | NotCLose Span Pos --start end
+  | NotClosed Span Pos --start end
   deriving (Show, Eq)
+
+data EvalError
+  = NotAFunction Span
+  | WrongNumberOfArguments Span Int Int -- expected got
+   deriving (Show,Eq)

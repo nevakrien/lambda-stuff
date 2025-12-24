@@ -1,5 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Span where
+module Span (
+  spanWithContext, spanText, mergeSpan
+)
+where
 
 import Types
 import qualified Data.Text as T
@@ -8,13 +11,13 @@ import qualified Data.Vector as V
 import Data.Text (Text)
 import Data.Vector (Vector)
 
-merge_span :: Span -> Span -> Span
-merge_span (Span s _) (Span _ e) = (Span s e)
+mergeSpan :: Span -> Span -> Span
+mergeSpan (Span s _) (Span _ e) = Span s e
 
-sliceLine :: Text -> Int -> Int -> Text
-sliceLine t a b
-  | b <= a    = T.empty
-  | otherwise = T.take (b - a) (T.drop a t)
+-- sliceLine :: Text -> Int -> Int -> Text
+-- sliceLine t a b
+--   | b <= a    = T.empty
+--   | otherwise = T.take (b - a) (T.drop a t)
 
 spanWithContext
   :: Vector Text

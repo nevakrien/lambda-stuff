@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Error where
+module Error(printParseError) where
 
 import Types
 import Span
@@ -41,7 +41,7 @@ printParseError src err = do
         ++ ansiReset)
       renderSpanContext src sp
 
-    NotCLose openSp endPos -> do
+    NotClosed openSp endPos -> do
       putStrLn (errorMessageStyle ++ "error: list opened here but never closed:" ++ ansiReset)
       renderSpanContextExtra src openSp endPos
 
@@ -53,7 +53,7 @@ printParseError src err = do
         UnexpectedEOF (Pos l c) -> (l, c)
         UnexpectedToken sp       -> spanStart (start sp)
         ExpectedButGot _ sp      -> spanStart (start sp)
-        NotCLose openSp _        -> spanStart (start openSp)
+        NotClosed openSp _        -> spanStart (start openSp)
 
     spanStart (Pos l c) = (l, c)
 

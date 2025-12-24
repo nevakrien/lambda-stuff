@@ -57,7 +57,7 @@ main = do
 
 
   ------------------------------------------------------------
-  putStrLn "\n== NotCLose (unclosed list) example =="
+  putStrLn "\n== NotClosed (unclosed list) example =="
   let ncSrc =
         [ "(print (square 5"
         , "1 e"

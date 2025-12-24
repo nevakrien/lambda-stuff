@@ -39,18 +39,17 @@ next_line (Input (Pos l _ ) _ rest') = do
   (next, rest'') <- V.uncons rest'
   pure (Input (Pos (addIndex 1 l) 0) next rest'')
 
-add_col :: Int -> Pos -> Pos 
-add_col n (Pos l c) = Pos l (addIndex n c)
+addCol :: Int -> Pos -> Pos 
+addCol n (Pos l c) = Pos l (addIndex n c)
 
-inc_col :: Pos -> Pos 
-inc_col = add_col 1
+incCol :: Pos -> Pos 
+incCol = addCol 1
 
 next_char :: Input -> Maybe ( Char,Input )
 next_char inp@(Input pos' cur' rest') =
   case T.uncons cur' of
     Just (c, next') ->
-      Just (c, Input (inc_col pos') next' rest')
-
+      Just (c, Input (incCol pos') next' rest')
     Nothing -> do
       inp' <- next_line inp
       next_char inp'
@@ -76,7 +75,7 @@ take_while f inp@(Input pos0 cur0 rest0)
   where
     (chunk, r) = T.span f cur0
     len        = T.length chunk
-    pos'       = add_col len pos0
+    pos'       = addCol len pos0
 
 skip_while :: (Char -> Bool) -> Input -> Input
 skip_while f inp@(Input pos0 cur0 rest0)
@@ -98,7 +97,7 @@ skip_while f inp@(Input pos0 cur0 rest0)
   where
     (chunk, r) = T.span f cur0
     len        = T.length chunk
-    pos'       = add_col len pos0
+    pos'       = addCol len pos0
 
 skip_space :: Input -> Input
 skip_space = skip_while isSpace
