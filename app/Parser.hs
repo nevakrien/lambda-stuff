@@ -1,56 +1,14 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 module Parser(
-  try_expr,
-  try_list,
   parse_expr,
-  parse_list
 )
 
- where
+where
 
 import Types
-import Lexer
-import Span ( mergeSpan )
-import Input
-import qualified Data.Text as T
-
-try_expr :: Input -> Maybe (AST, Input)
-try_expr inp = do
-  (tok, sp, inp1) <- try_token inp
-  case tok of
-    TokenNum n      -> pure (ASTNum sp n, inp1)
-    TokenString s   -> pure (ASTString sp s, inp1)
-    TokenIdent s    -> pure (ASTSymbol sp s, inp1)
-    TokenLParen     -> _try_list_from_open sp inp1
-    TokenRParen     -> Nothing   -- unexpected ')'
-
-try_list :: Input -> Maybe (AST, Input)
-try_list = _try_list . skip_space
-
-_try_list :: Input -> Maybe (AST, Input)
-_try_list inp0 = do
-  (TokenLParen, spOpen, inp1) <- try_token inp0
-  _try_list_from_open spOpen inp1
-
-_try_list_from_open :: Span -> Input -> Maybe (AST, Input)
-_try_list_from_open spOpen = loop []
-  where
-    loop acc inp =
-      case try_token inp of
-
-        -- closing paren ends the list
-        Just (TokenRParen, spClose, inp') ->
-          pure (ASTList (mergeSpan spOpen spClose) (reverse acc), inp')
-
-        -- more parse_expressions inside the list
-        Just _ -> do
-          (e, inp1) <- try_expr inp
-          loop (e:acc) inp1
-
-        -- EOF before ')'
-        Nothing ->
-          Nothing
+import Lexer ( try_token )  
+import Span ( mergeSpan, spanOf, withSpan )
 
 parse_token :: Input -> Result ParseError (Token, Span, Input)
 parse_token inp =
@@ -58,25 +16,85 @@ parse_token inp =
     (Err (UnexpectedEOF (pos inp))) 
     Ok (try_token inp)
 
+
+
+-- classifier:
+--   given a token returns a node builder
+--   otherwise Nothing means "this token is not a binop here"
+type BinClassifier =
+  Token -> Maybe (Span -> AST -> AST -> AST)
+
+parse_bin
+  :: BinClassifier
+  -> (Input -> Result ParseError (AST, Input))
+  -> Input
+  -> Result ParseError (AST, Input)
+parse_bin classify parse_inner inp0 = do
+  (base, inp1) <- parse_inner inp0
+  loop base inp1
+  where
+    loop lhs inp =
+      case try_token inp of
+        Just (tok, _, inp2)
+          | Just mkNode <- classify tok -> do
+              (rhs, inp3) <- parse_inner inp2
+              let s   = mergeSpan (spanOf lhs) (spanOf rhs)
+                  ast = mkNode s lhs rhs
+              loop ast inp3          -- keep chaining (left associative)
+
+        _ -> Ok (lhs, inp)          -- no matching operator → stop
+
+
 parse_expr :: Input -> Result ParseError (AST, Input)
-parse_expr inp = do
+parse_expr = parse_assign 
+
+parse_assign :: Input -> Result ParseError (AST, Input)
+parse_assign =
+  parse_bin classify parse_rexp
+  where
+    classify TokenEqual = Just ASTAssign
+    classify _          = Nothing
+
+
+parse_rexp :: Input -> Result ParseError (AST, Input)
+parse_rexp = parse_add
+
+parse_add :: Input -> Result ParseError (AST, Input)
+parse_add =
+  parse_bin classify parse_mul
+  where
+    classify TokenPlus  = Just ASTAdd
+    classify TokenMinus = Just ASTSub
+    classify _          = Nothing
+
+
+parse_mul :: Input -> Result ParseError (AST, Input)
+parse_mul =
+  parse_bin classify parse_atom
+  where
+    classify TokenStar = Just ASTMul
+    classify TokenSlash = Just ASTDiv
+    classify _ = Nothing
+
+
+
+parse_atom :: Input -> Result ParseError (AST, Input)
+parse_atom inp = do
   (tok, sp, inp1) <- parse_token inp
   case tok of
     TokenNum n    -> Ok (ASTNum sp n, inp1)
     TokenString s -> Ok (ASTString sp s, inp1)
     TokenIdent s  -> Ok (ASTSymbol sp s, inp1)
-    TokenLParen   -> parse_list_from_open sp inp1
-    TokenRParen   -> Err (UnexpectedToken sp )
+    TokenLParen   -> do 
+      (x, inp2) <- parse_list_from_open sp inp1
+      Ok (disambiguate_list x, inp2)
+    _   -> Err (UnexpectedToken sp )
 
-parse_list :: Input -> Result ParseError (AST, Input)
-parse_list = listStartE . skip_space
 
-listStartE :: Input -> Result ParseError (AST, Input)
-listStartE inp0 = do
-  (tok, spOpen, inp1) <- parse_token inp0
-  case tok of
-    TokenLParen -> parse_list_from_open spOpen inp1
-    _         -> Err (ExpectedButGot (T.pack "'('") spOpen )
+disambiguate_list :: AST -> AST
+disambiguate_list (ASTCall sp []) = ASTVoid sp 
+disambiguate_list (ASTCall sp [x]) = withSpan sp x 
+disambiguate_list x = x
 
 parse_list_from_open :: Span -> Input -> Result ParseError (AST, Input)
 parse_list_from_open spOpen = loop []
@@ -85,13 +103,16 @@ parse_list_from_open spOpen = loop []
       case try_token inp of
         -- closing paren ends list
         Just (TokenRParen, spClose, inp') ->
-          Ok (ASTList (mergeSpan spOpen spClose) (reverse acc), inp')
+          Ok (ASTCall (mergeSpan spOpen spClose) (reverse acc), inp')
 
         -- definitely another parse_expression
         Just _ -> do
-          (e, inp1) <- parse_expr inp
+          (e, inp1) <- parse_rexp inp
           loop (e:acc) inp1
 
         -- EOF before ')'
         Nothing ->
           Err (NotClosed spOpen (pos inp))
+
+
+

@@ -1,6 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Span (
   spanWithContext, spanText, mergeSpan
+  ,spanOf, withSpan
 )
 where
 
@@ -13,6 +14,30 @@ import Data.Vector (Vector)
 
 mergeSpan :: Span -> Span -> Span
 mergeSpan (Span s _) (Span _ e) = Span s e
+
+spanOf :: AST -> Span
+spanOf (ASTNum    sp _)   = sp
+spanOf (ASTString sp _)   = sp
+spanOf (ASTSymbol sp _)   = sp
+spanOf (ASTCall   sp _)   = sp
+spanOf (ASTAssign sp _ _) = sp
+spanOf (ASTAdd    sp _ _) = sp
+spanOf (ASTSub    sp _ _) = sp
+spanOf (ASTMul    sp _ _) = sp
+spanOf (ASTDiv    sp _ _) = sp
+spanOf (ASTVoid   sp )    = sp
+
+withSpan :: Span -> AST -> AST
+withSpan sp (ASTNum    _ n)   = ASTNum    sp n
+withSpan sp (ASTString _ s)   = ASTString sp s
+withSpan sp (ASTSymbol _ s)   = ASTSymbol sp s  
+withSpan sp (ASTCall   _ xs)  = ASTCall   sp xs
+withSpan sp (ASTAssign _ a b) = ASTAssign sp a b
+withSpan sp (ASTAdd    _ a b) = ASTAdd    sp a b
+withSpan sp (ASTSub    _ a b) = ASTSub    sp a b
+withSpan sp (ASTMul    _ a b) = ASTMul    sp a b
+withSpan sp (ASTDiv    _ a b) = ASTDiv    sp a b
+withSpan sp (ASTVoid   _ )    = ASTVoid   sp
 
 -- sliceLine :: Text -> Int -> Int -> Text
 -- sliceLine t a b

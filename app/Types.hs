@@ -8,6 +8,7 @@ module Types
   , AST(..)
   , ParseError(..)
   , Value(..)
+  , Func(..)
   , EvalError(..)
   , Result
   , pattern Ok
@@ -40,22 +41,39 @@ data Input = Input {
 
 data Token
   = TokenIdent  Text
+  | TokenLambdaVar  Text
   | TokenNum    Word64
   | TokenString Text
   | TokenLParen
   | TokenRParen
+  | TokenEqual
+  | TokenPlus
+  | TokenMinus
+  | TokenStar
+  | TokenSlash
   deriving (Show, Eq)
 
 data AST
   = ASTNum    Span Word64
   | ASTString Span Text
   | ASTSymbol Span Text
-  | ASTList   Span [AST]
+  | ASTCall   Span [AST]
+  | ASTAssign Span AST AST
+  | ASTAdd    Span AST AST
+  | ASTSub  Span AST AST
+  | ASTMul    Span AST AST
+  | ASTDiv    Span AST AST
+  | ASTVoid   Span
   deriving (Show, Eq)
+
+data Func = Func 
+  deriving (Show,Eq)
 
 data Value
   = ValNum    Word64
   | ValString Text
+  | ValVoid
+  | ValFunc Func
   deriving (Show,Eq)
 
 data ParseError
@@ -68,6 +86,7 @@ data ParseError
 data EvalError
   = NotAFunction Span
   | WrongNumberOfArguments Span Int Int -- expected got
+  | UnknownVar Span Text
    deriving (Show,Eq)
 
 

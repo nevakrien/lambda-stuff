@@ -125,14 +125,21 @@ try_token inp0 =
               do (txt, sp, inp') <- _try_string inp
                  pure (TokenString txt, sp, inp')
 
-          | c == '(' ->
-              do (_, inp') <- next_char inp
-                 let sp = Span (pos inp) (pos inp')
-                 pure (TokenLParen, sp, inp')
-
-          | c == ')' ->
-              do (_, inp') <- next_char inp
-                 let sp = Span (pos inp) (pos inp')
-                 pure (TokenRParen, sp, inp')
-
+          | c == '(' -> consume1 TokenLParen inp
+          | c == ')' -> consume1 TokenRParen inp
+          | c == '=' -> consume1 TokenEqual  inp
+          | c == '+' -> consume1 TokenPlus   inp
+          | c == '-' -> consume1 TokenMinus inp
+          | c == '*' -> consume1 TokenStar   inp
+          | c == '/' -> case _try_ident inp of
+              Just(txt,_,inp') -> 
+                let s = Span (pos inp) (pos inp') in
+                pure (TokenIdent txt, s, inp')
+              Nothing -> consume1 TokenSlash   inp
        _ -> Nothing
+  where
+    consume1 :: Token -> Input -> Maybe (Token, Span, Input)
+    consume1 tok i = do
+      (_, i') <- next_char i
+      let sp = Span (pos i) (pos i')
+      pure (tok, sp, i')
