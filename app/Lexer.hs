@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
 module Lexer where
@@ -123,7 +124,11 @@ try_token inp0 =
        Just (c, _) 
           | isAlpha c ->
               do (txt, sp, inp') <- _try_ident inp
-                 pure (TokenIdent txt, sp, inp')
+                 case txt of
+                  "if"     -> pure (TokenIf, sp, inp')
+                  "then"   -> pure (TokenThen, sp, inp')
+                  "else"   -> pure (TokenElse, sp, inp')
+                  _ -> pure (TokenIdent txt, sp, inp')
 
           | isDigit c ->
               do (n, sp, inp') <- _try_num inp

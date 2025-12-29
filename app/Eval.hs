@@ -11,6 +11,11 @@ import Data.Text (Text)
 import Data.Word (Word64)
 import Control.Monad (foldM)
 
+eval_keep_env :: Env -> AST -> Result EvalError (Value,Env)
+eval_keep_env env ast = do
+    (val, _newEnv) <- eval env ast
+    Ok (val, env)
+
 eval :: Env -> AST -> Result EvalError (Value,Env)
 eval env (ASTNum _ n) = Ok (ValNum n, env)
 eval env (ASTVoid _) = Ok (ValVoid, env)
@@ -57,8 +62,6 @@ eval env (ASTCall sp (f:args)) = do
         (res, _) <- eval env' (funcBody func)
         Ok (res, _callEnv)   -- caller env unchanged  
 
-
-
 eval env (ASTAdd _ lhs rhs) =
     eval_binop env lhs rhs (numOp (+))
 
@@ -73,8 +76,14 @@ eval env (ASTDiv sp lhs rhs) =
   where
     divOp (ValNum _ ) _ (ValNum 0) _ = Err ( DivisionByZero sp)
     divOp (ValNum a) _ (ValNum b) _ = Ok (ValNum (a `div` b))
-    divOp (ValNum a) _ _ spb = Err (NotANumber spb)
+    divOp (ValNum _) _ _ spb = Err (NotANumber spb)
     divOp _ spa _ _ = Err (NotANumber spa)
+
+eval env (ASTIf _ cond thenBr elseBr) = do
+    (condVal, env1) <- eval env cond
+    case condVal of
+      ValNum 0 -> eval_keep_env env1 elseBr
+      _        -> eval_keep_env env1 thenBr
 
 eval env ast = Err (TODO)
 

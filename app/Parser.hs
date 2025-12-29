@@ -16,8 +16,12 @@ parse_token inp =
     (Err (UnexpectedEOF (pos inp))) 
     Ok (try_token inp)
 
-
-
+expect_token :: Token-> Input -> Result ParseError (Span, Input)
+expect_token expected inp = do
+  (tok, sp, inp1) <- parse_token inp
+  if tok == expected
+    then Ok (sp, inp1)
+    else Err (UnexpectedToken sp)
 -- classifier:
 --   given a token returns a node builder
 --   otherwise Nothing means "this token is not a binop here"
@@ -94,6 +98,17 @@ parse_atom inp = do
       let full_sp = mergeSpan sp (spanOf body)
       let funcAst = ASTFunc full_sp body sp argName
       Ok (funcAst, inp2)
+    
+    TokenIf -> do
+      (cond, inp2) <- parse_rexp inp1
+      ( _, inp3) <- expect_token TokenThen inp2
+      (thenBranch, inp4) <- parse_rexp inp3
+      ( else_sp, inp5) <- expect_token TokenElse inp4
+      (elseBranch, inp6) <- parse_rexp inp5
+      let full_sp = mergeSpan sp else_sp
+      let ifAst = ASTIf full_sp cond thenBranch elseBranch
+      Ok (ifAst, inp6)
+
     _   -> Err (UnexpectedToken sp )
 
 

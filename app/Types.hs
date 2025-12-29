@@ -53,6 +53,9 @@ data Token
   | TokenMinus
   | TokenStar
   | TokenSlash
+  | TokenIf
+  | TokenThen
+  | TokenElse
   deriving (Show, Eq)
 
 data AST
@@ -63,10 +66,11 @@ data AST
   | ASTFunc   Span AST Span Text -- fullspan body argspan argname
   | ASTAssign Span AST AST
   | ASTAdd    Span AST AST
-  | ASTSub  Span AST AST
+  | ASTSub    Span AST AST
   | ASTMul    Span AST AST
   | ASTDiv    Span AST AST
   | ASTVoid   Span
+  | ASTIf     Span AST AST AST
   deriving (Show, Eq)
 
 
