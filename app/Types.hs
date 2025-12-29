@@ -56,6 +56,7 @@ data Token
   | TokenIf
   | TokenThen
   | TokenElse
+  | TokenInvalid Char
   deriving (Show, Eq)
 
 data AST

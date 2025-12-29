@@ -7,3 +7,8 @@ factorial = (Z /self /n
   	then n * (self (n - 1)) 
   	else 1
 )
+
+count = 
+	( Z \count /n /f /x  
+		if n then (count n-1 f (f x)) else x 
+	)

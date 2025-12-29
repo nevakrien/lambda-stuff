@@ -97,6 +97,7 @@ runFile filePath = do
       exitFailure
     else do
       vec <- read_file filePath
+      print vec
       result <- execFile vec emptyEnv
       case result of
         Left err -> do

@@ -148,6 +148,12 @@ try_token inp0 =
               Just(txt,s,inp') -> 
                 pure (TokenLambdaVar txt, s, inp')
               Nothing -> consume1 TokenSlash   inp
+          
+          | c == '\\' -> case _try_prefixed_ident inp of
+              Just(txt,s,inp') -> 
+                pure (TokenLambdaVar txt, s, inp')
+              Nothing -> consume1 (TokenInvalid c) inp
+          | otherwise -> consume1 (TokenInvalid c) inp
        _ -> Nothing
   where
     consume1 :: Token -> Input -> Maybe (Token, Span, Input)

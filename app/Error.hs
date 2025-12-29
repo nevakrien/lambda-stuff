@@ -77,6 +77,8 @@ renderStyledError pre mid post = do
     ++ T.unpack post
 
 
+-- renderSpanContextExtra :: Vector Text -> Span -> Pos -> IO ()
+-- renderSpanContextExtra src sp endPos = renderSpanContext src sp
 renderSpanContextExtra :: Vector Text -> Span -> Pos -> IO ()
 renderSpanContextExtra src sp endPos = do
   -- normal highlight split
@@ -84,7 +86,7 @@ renderSpanContextExtra src sp endPos = do
 
   -- span from open start → end position
   let (_, midToEnd0, _) =
-        spanWithContext src (Span (start sp) endPos)
+        spanWithContext src (Span (end sp) endPos)
 
   putStrLn $
        T.unpack pre
