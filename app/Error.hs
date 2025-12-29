@@ -106,9 +106,9 @@ printEvalError src err = do
       putStrLn "not a function:"
       renderSpanContext src sp
 
-    WrongNumberOfArguments sp expected got -> do
-      putStrLn $ "wrong number of arguments: expected " ++ show expected ++ ", got " ++ show got
-      renderSpanContext src sp
+    -- WrongNumberOfArguments sp expected got -> do
+    --   putStrLn $ "wrong number of arguments: expected " ++ show expected ++ ", got " ++ show got
+    --   renderSpanContext src sp
 
     UnknownVar sp name -> do
       putStrLn $ "unknown variable '" ++ T.unpack name ++ "':"
@@ -129,7 +129,7 @@ printEvalError src err = do
     (posLine, posCol) =
       case err of
         NotAFunction sp -> spanStart (start sp)
-        WrongNumberOfArguments sp _ _ -> spanStart (start sp)
+        -- WrongNumberOfArguments sp _ _ -> spanStart (start sp)
         UnknownVar sp _ -> spanStart (start sp)
         NotANumber sp -> spanStart (start sp)
         DivisionByZero sp -> spanStart (start sp)

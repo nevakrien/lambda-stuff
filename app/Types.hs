@@ -13,6 +13,7 @@ module Types
   , Result
   , pattern Ok
   , pattern Err
+  , Env
   )
 where
 
@@ -22,6 +23,7 @@ import Data.Word (Word32, Word64)
 import qualified Data.Vector()
 import Data.Vector (Vector)
 import Data.Type.Bool ()
+import qualified Data.Map.Strict as M
 
 data Pos = Pos
   { line :: !Word32
@@ -58,6 +60,7 @@ data AST
   | ASTString Span Text
   | ASTSymbol Span Text
   | ASTCall   Span [AST]
+  | ASTFunc   Span AST Span Text -- fullspan body argspan argname
   | ASTAssign Span AST AST
   | ASTAdd    Span AST AST
   | ASTSub  Span AST AST
@@ -66,7 +69,16 @@ data AST
   | ASTVoid   Span
   deriving (Show, Eq)
 
+
+type Env = M.Map Text Value
+
 data Func = Func 
+  { 
+    captureEnv :: Env
+  , funcBody :: AST
+  , funcArgName :: Text
+  , funcArgSpan :: Span
+  }
   deriving (Show,Eq)
 
 data Value
@@ -85,7 +97,7 @@ data ParseError
 
 data EvalError
   = NotAFunction Span
-  | WrongNumberOfArguments Span Int Int -- expected got
+  -- | WrongNumberOfArguments Span Int Int -- expected got
   | UnknownVar Span Text
   | NotANumber Span
   | DivisionByZero Span

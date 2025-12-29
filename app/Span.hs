@@ -26,6 +26,7 @@ spanOf (ASTSub    sp _ _) = sp
 spanOf (ASTMul    sp _ _) = sp
 spanOf (ASTDiv    sp _ _) = sp
 spanOf (ASTVoid   sp )    = sp
+spanOf (ASTFunc  sp _ _ _) = sp
 
 withSpan :: Span -> AST -> AST
 withSpan sp (ASTNum    _ n)   = ASTNum    sp n
@@ -38,6 +39,7 @@ withSpan sp (ASTSub    _ a b) = ASTSub    sp a b
 withSpan sp (ASTMul    _ a b) = ASTMul    sp a b
 withSpan sp (ASTDiv    _ a b) = ASTDiv    sp a b
 withSpan sp (ASTVoid   _ )    = ASTVoid   sp
+withSpan sp (ASTFunc  _ body argSpan argName) = ASTFunc sp body argSpan argName
 
 -- sliceLine :: Text -> Int -> Int -> Text
 -- sliceLine t a b

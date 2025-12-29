@@ -88,6 +88,12 @@ parse_atom inp = do
     TokenLParen   -> do 
       (x, inp2) <- parse_list_from_open sp inp1
       Ok (disambiguate_list x, inp2)
+
+    TokenLambdaVar argName -> do
+      (body, inp2) <- parse_rexp inp1
+      let full_sp = mergeSpan sp (spanOf body)
+      let funcAst = ASTFunc full_sp body sp argName
+      Ok (funcAst, inp2)
     _   -> Err (UnexpectedToken sp )
 
 

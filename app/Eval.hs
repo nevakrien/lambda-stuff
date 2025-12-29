@@ -1,13 +1,15 @@
 -- module Eval(Env,eval) where
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use camelCase" #-}
-module Eval(Env,eval,searchVar,emptyEnv) where
+{-# LANGUAGE NamedFieldPuns #-}
+
+module Eval(eval,searchVar,emptyEnv) where
 import Types
 import Span
 import qualified Data.Map.Strict as M
-import Data.Foldable (asum)
 import Data.Text (Text)
 import Data.Word (Word64)
+import Control.Monad (foldM)
 
 eval :: Env -> AST -> Result EvalError (Value,Env)
 eval env (ASTNum _ n) = Ok (ValNum n, env)
@@ -20,6 +22,42 @@ eval env (ASTAssign _ (ASTSymbol _ name) rhs) = do
     (val, env1) <- eval env rhs
     let env2 = insertVar name val env1
     Ok (val, env2)
+
+eval env (ASTFunc _ body argSpan argName) = do
+    let func = Func { 
+        captureEnv = env, 
+        funcBody = body, 
+        funcArgName = argName, 
+        funcArgSpan = argSpan 
+    }
+    Ok (ValFunc func, env)
+
+-- eval env (ASTCall sp (f:arg:[])) = do
+--   (fVal, env1) <- eval env f
+--   func <- expectFunc (spanOf f) fVal
+--   (argVal, env2) <- eval env1 arg
+--   applyFunc sp env2 func argVal
+
+--(f *args) call f(a1)(a2)... if at any point f is not a function error
+eval env (ASTCall sp (f:args)) = do
+  -- evaluate the function expression first
+  (fVal, env1) <- eval env f
+  -- now fold left through all arguments
+  foldM step (fVal, env1) args
+  where
+    step :: (Value, Env) -> AST -> Result EvalError (Value, Env)
+    step (curVal, curEnv) argAst = do
+      func <- expectFunc sp curVal
+      (argVal, env2) <- eval curEnv argAst
+      applyFunc sp env2 func argVal
+    
+    applyFunc :: Span -> Env -> Func -> Value -> Result EvalError (Value, Env)
+    applyFunc sp _callEnv func argVal = do
+        let env' = M.insert (funcArgName func) argVal (captureEnv func)
+        (res, _) <- eval env' (funcBody func)
+        Ok (res, _callEnv)   -- caller env unchanged  
+
+
 
 eval env (ASTAdd _ lhs rhs) =
     eval_binop env lhs rhs (numOp (+))
@@ -65,49 +103,21 @@ expectNum :: Span -> Value -> Result EvalError Word64
 expectNum sp (ValNum n) = Ok n
 expectNum sp _          = Err (NotANumber sp)
 
+expectFunc :: Span -> Value -> Result EvalError Func
+expectFunc sp (ValFunc f) = Ok f
+expectFunc sp _           = Err (NotAFunction sp)
 
-runFunc :: Func -> [Value] -> Result EvalError Value
-runFunc _ _ = Ok ValVoid
-
--- evalFunc :: Env -> AST -> Result EvalError Func
--- evalFunc env x =
---     case eval env x of
---       Ok (ValFunc f) -> Ok f
---       Ok _           -> Err (NotAFunction (spanOf x))
---       Err e          -> Err e
-
--- One frame = local scope
-type Frame = M.Map Text Value
-
--- Environment is stack of frames
-newtype Env = Env [Frame]
-  deriving (Show)
 
 emptyEnv :: Env
-emptyEnv = Env [M.empty]
+emptyEnv = M.empty
 
 searchVar :: Env -> Span -> Text -> Result EvalError Value
-searchVar (Env frames) s name =
-  case asum (map (M.lookup name) frames) of
+searchVar env s name =
+  case M.lookup name env of
     Just v  -> Ok v
     Nothing -> Err (UnknownVar s name)
 
--- Insert into top frame
+-- Insert a variable into the environment
 insertVar :: Text -> Value -> Env -> Env
-insertVar name val (Env (f:fs)) =
-    Env (M.insert name val f : fs)
-insertVar _ _ (Env []) =
-    error "Env invariant broken: no frames"
-
--- Push a new lexical scope
-pushFrame :: Env -> Env
-pushFrame (Env frames) = Env (M.empty : frames)
-
--- Pop scope
-popFrame :: Env -> Env
-popFrame (Env (_:fs)) = Env fs
-popFrame (Env []) =
-    error "Env invariant broken: no frames"
-
-
+insertVar name val env = M.insert name val env
 

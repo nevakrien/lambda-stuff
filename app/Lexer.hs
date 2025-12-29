@@ -35,6 +35,14 @@ _try_ident inp@(Input pos0 _ _) = do
     else
       Nothing
 
+_try_prefixed_ident :: Input -> Maybe (Text, Span, Input)
+_try_prefixed_ident inp@(Input pos0 _ _) = do
+  (_, inp1) <- next_char inp
+  (t,_,inp2) <- _try_ident inp1
+  let s = Span pos0 (pos inp2)
+  pure(t, s, inp2)
+
+
 try_num :: Input -> Maybe (Word64, Span, Input)
 try_num = _try_num . skip_space
 
@@ -131,10 +139,9 @@ try_token inp0 =
           | c == '+' -> consume1 TokenPlus   inp
           | c == '-' -> consume1 TokenMinus inp
           | c == '*' -> consume1 TokenStar   inp
-          | c == '/' -> case _try_ident inp of
-              Just(txt,_,inp') -> 
-                let s = Span (pos inp) (pos inp') in
-                pure (TokenIdent txt, s, inp')
+          | c == '/' -> case _try_prefixed_ident inp of
+              Just(txt,s,inp') -> 
+                pure (TokenLambdaVar txt, s, inp')
               Nothing -> consume1 TokenSlash   inp
        _ -> Nothing
   where
@@ -143,3 +150,6 @@ try_token inp0 =
       (_, i') <- next_char i
       let sp = Span (pos i) (pos i')
       pure (tok, sp, i')
+
+third :: (a,b,c) -> c
+third (_,_,x) = x
