@@ -87,6 +87,9 @@ data EvalError
   = NotAFunction Span
   | WrongNumberOfArguments Span Int Int -- expected got
   | UnknownVar Span Text
+  | NotANumber Span
+  | DivisionByZero Span
+  | TODO
    deriving (Show,Eq)
 
 

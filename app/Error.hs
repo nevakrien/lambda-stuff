@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-module Error(printParseError) where
+module Error(printParseError, printEvalError) where
 
 import Types
 import Span
@@ -95,6 +95,51 @@ renderSpanContextExtra src sp endPos = do
     -- ++ clipEnd 1000 midToEnd1
 
 
+
+printEvalError :: Vector Text -> EvalError -> IO ()
+printEvalError src err = do
+  putStrLn ("at " ++ showLineCol posLine posCol)
+  putStrLn (errorMessageStyle ++ "evaluation error:" ++ ansiReset)
+
+  case err of
+    NotAFunction sp -> do
+      putStrLn "not a function:"
+      renderSpanContext src sp
+
+    WrongNumberOfArguments sp expected got -> do
+      putStrLn $ "wrong number of arguments: expected " ++ show expected ++ ", got " ++ show got
+      renderSpanContext src sp
+
+    UnknownVar sp name -> do
+      putStrLn $ "unknown variable '" ++ T.unpack name ++ "':"
+      renderSpanContext src sp
+
+    NotANumber sp -> do
+      putStrLn "not a number:"
+      renderSpanContext src sp
+
+    DivisionByZero sp -> do
+      putStrLn "division by zero:"
+      renderSpanContext src sp
+
+    TODO -> do
+      putStrLn "feature not yet implemented"
+
+  where
+    (posLine, posCol) =
+      case err of
+        NotAFunction sp -> spanStart (start sp)
+        WrongNumberOfArguments sp _ _ -> spanStart (start sp)
+        UnknownVar sp _ -> spanStart (start sp)
+        NotANumber sp -> spanStart (start sp)
+        DivisionByZero sp -> spanStart (start sp)
+        TODO -> (0, 0)
+
+    spanStart (Pos l c) = (l, c)
+
+    showLineCol l c =
+      "line " ++ show (fromIntegral l + 1 :: Int)
+      ++ ", column " ++ show (fromIntegral c + 1 :: Int)
 
 clipEnd :: Int -> Text -> String
 clipEnd maxLen txt
