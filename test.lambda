@@ -1,0 +1,9 @@
+# Test program
+x = 10
+y = 20
+sum = x + y
+# Display result
+sum
+product = x * y
+product
+

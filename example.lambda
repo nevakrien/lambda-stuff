@@ -1,0 +1,11 @@
+Z = /f 
+	((/x (f (/v ((x x) v)))) 
+	(/x (f (/v ((x x) v)))))
+
+fact = (Z /self /n 
+  if n 
+  	then n * (self (n - 1)) 
+  	else 1
+)
+
+(fact 5)
